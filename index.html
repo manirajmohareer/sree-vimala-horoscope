@@ -366,6 +366,11 @@
       </div>
 
       <div class="field">
+        <label for="pincode">Pincode <span class="req">*</span></label>
+        <input type="text" id="pincode" name="pincode" placeholder="e.g. 560001" maxlength="6" required />
+      </div>
+
+      <div class="field">
         <label for="email">Email Address <span class="req">*</span></label>
         <input type="email" id="email" name="email" placeholder="you@example.com" required />
       </div>
@@ -390,10 +395,10 @@
 
       <div class="qr-wrapper">
         
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=sample@upi&pn=SreeVimalaHoroscope&am=500&cu=INR" width="180" height="180" alt="UPI QR Code" style="display:block;" />
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=sample@upi&pn=SreeVimalaHoroscope&am=1500&cu=INR" width="180" height="180" alt="UPI QR Code" style="display:block;" />
       </div>
 
-      <div class="modal-amount">₹ 500 /-</div>
+      <div class="modal-amount">₹ 1,500 /-</div>
       <p class="modal-note">
         After payment, please send the screenshot to our WhatsApp.<br/>
         Your <strong>Janma Patrika</strong> will be delivered to your email &amp; WhatsApp within 24–48 hours.
@@ -450,7 +455,7 @@
       e.preventDefault();
 
       // Basic validation
-      const fields = ['fullName', 'dob', 'tob', 'pob', 'email', 'phone'];
+      const fields = ['fullName', 'dob', 'tob', 'pob', 'pincode', 'email', 'phone'];
       for (const id of fields) {
         if (!document.getElementById(id).value.trim()) {
           showToast('Please fill in all required fields.', true);
@@ -466,7 +471,7 @@
         full_name:     document.getElementById('fullName').value.trim(),
         date_of_birth: document.getElementById('dob').value,
         time_of_birth: document.getElementById('tob').value,
-        place_of_birth:document.getElementById('pob').value.trim(),
+        place_of_birth: document.getElementById('pob').value.trim() + ' - ' + document.getElementById('pincode').value.trim(),
         email:         document.getElementById('email').value.trim(),
         phone:         document.getElementById('phone').value.trim(),
         to_email:      'manirajmohareer@gmail.com',   // your receiving email

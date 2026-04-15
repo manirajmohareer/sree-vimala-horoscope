@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sree Vimala Horoscope – Janma Patrika</title>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet" />
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+  <style>
+    :root {
+      --saffron:     #E8630A;
+      --gold:        #C9920A;
+      --gold-light:  #F0C040;
+      --deep:        #1A0A00;
+      --maroon:      #5C1A00;
+      --cream:       #FDF6E3;
+      --cream-dark:  #F5E9C8;
+      --red-dot:     #C0392B;
+      --text:        #2C1200;
+      --muted:       #7A5C3A;
+      --border:      rgba(201,146,10,0.35);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--deep);
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(232,99,10,0.18) 0%, transparent 70%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0 L60 30 L30 60 L0 30 Z' fill='none' stroke='rgba(201,146,10,0.06)' stroke-width='1'/%3E%3C/svg%3E");
+      min-height: 100vh;
+      font-family: 'Crimson Pro', Georgia, serif;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── HEADER ── */
+    header {
+      width: 100%;
+      text-align: center;
+      padding: 3rem 1.5rem 1.5rem;
+      position: relative;
+    }
+    .om {
+      font-size: 2.8rem;
+      color: var(--gold-light);
+      display: block;
+      margin-bottom: 0.4rem;
+      animation: glow 3s ease-in-out infinite alternate;
+      text-shadow: 0 0 18px rgba(240,192,64,0.7);
+    }
+    @keyframes glow {
+      from { text-shadow: 0 0 8px rgba(240,192,64,0.5); }
+      to   { text-shadow: 0 0 28px rgba(240,192,64,0.9), 0 0 50px rgba(232,99,10,0.4); }
+    }
+    h1 {
+      font-family: 'Cinzel Decorative', serif;
+      font-size: clamp(1.5rem, 5vw, 2.8rem);
+      color: var(--gold-light);
+      letter-spacing: 0.04em;
+      line-height: 1.25;
+      text-shadow: 0 2px 12px rgba(201,146,10,0.5);
+    }
+    .subtitle {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(0.8rem, 2vw, 1rem);
+      color: var(--saffron);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-top: 0.5rem;
+    }
+    .divider {
+      margin: 1.2rem auto 0;
+      width: min(360px, 80%);
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+      position: relative;
+    }
+    .divider::before {
+      content: '✦';
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--gold-light);
+      font-size: 0.9rem;
+      background: var(--deep);
+      padding: 0 0.5rem;
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: linear-gradient(160deg, var(--cream) 0%, var(--cream-dark) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow:
+        0 0 0 1px rgba(201,146,10,0.12),
+        0 8px 40px rgba(26,10,0,0.7),
+        inset 0 1px 0 rgba(255,255,255,0.6);
+      width: min(580px, 94vw);
+      padding: clamp(1.5rem, 5vw, 3rem);
+      margin: 1rem 0 3rem;
+      position: relative;
+      overflow: hidden;
+    }
+    /* corner ornaments */
+    .card::before, .card::after {
+      content: '';
+      position: absolute;
+      width: 60px; height: 60px;
+      border-color: var(--gold);
+      border-style: solid;
+      opacity: 0.35;
+    }
+    .card::before { top: 8px; left: 8px;  border-width: 2px 0 0 2px; }
+    .card::after  { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+    .card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 1rem;
+      color: var(--maroon);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 1.8rem;
+    }
+    .card-title span {
+      display: inline-block;
+      border-bottom: 1px solid var(--gold);
+      padding-bottom: 0.3rem;
+    }
+
+    /* ── FORM ── */
+    .form-grid {
+      display: grid;
+      gap: 1.2rem;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    label {
+      font-family: 'Cinzel', serif;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--maroon);
+    }
+    label .req { color: var(--red-dot); margin-left: 2px; }
+
+    input, select {
+      background: rgba(255,255,255,0.7);
+      border: 1px solid rgba(201,146,10,0.4);
+      border-radius: 2px;
+      padding: 0.65rem 0.9rem;
+      font-family: 'Crimson Pro', serif;
+      font-size: 1.05rem;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    input:focus, select:focus {
+      border-color: var(--gold);
+      background: rgba(255,255,255,0.95);
+      box-shadow: 0 0 0 3px rgba(201,146,10,0.15);
+    }
+    input::placeholder { color: var(--muted); opacity: 0.7; font-style: italic; }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 420px) { .row-2 { grid-template-columns: 1fr; } }
+
+    /* ── SUBMIT BTN ── */
+    .btn {
+      margin-top: 0.6rem;
+      width: 100%;
+      padding: 0.85rem 1.5rem;
+      font-family: 'Cinzel', serif;
+      font-size: 0.9rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--deep);
+      background: linear-gradient(135deg, var(--gold-light) 0%, var(--saffron) 100%);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: filter 0.2s, transform 0.15s;
+      box-shadow: 0 3px 14px rgba(232,99,10,0.4);
+    }
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.25), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
+    .btn:hover::before { opacity: 1; }
+    .btn:active { transform: translateY(0); filter: brightness(0.97); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(10,4,0,0.85);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+
+    .modal {
+      background: linear-gradient(160deg, var(--cream) 0%, var(--cream-dark) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 16px 60px rgba(0,0,0,0.8);
+      width: min(420px, 92vw);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      position: relative;
+      transform: scale(0.92);
+      transition: transform 0.3s;
+    }
+    .modal-overlay.show .modal { transform: scale(1); }
+
+    .modal-title {
+      font-family: 'Cinzel Decorative', serif;
+      font-size: 1.1rem;
+      color: var(--maroon);
+      margin-bottom: 0.3rem;
+    }
+    .modal-sub {
+      font-size: 0.95rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: 1.4rem;
+    }
+    .qr-wrapper {
+      background: #fff;
+      border: 2px solid var(--gold);
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      margin-bottom: 1.2rem;
+    }
+    .qr-placeholder {
+      width: 180px; height: 180px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 0.5rem;
+      color: var(--muted);
+      font-family: 'Cinzel', serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-align: center;
+    }
+    .qr-placeholder svg { opacity: 0.4; }
+
+    .modal-amount {
+      font-family: 'Cinzel', serif;
+      font-size: 1.3rem;
+      color: var(--saffron);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .modal-note {
+      font-size: 0.9rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .modal-note strong { color: var(--maroon); }
+
+    .close-btn {
+      margin-top: 1.4rem;
+      padding: 0.6rem 2rem;
+      font-family: 'Cinzel', serif;
+      font-size: 0.75rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--maroon);
+      background: transparent;
+      border: 1px solid var(--gold);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .close-btn:hover { background: var(--gold); color: var(--deep); }
+
+    /* ── TOAST ── */
+    .toast {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--deep);
+      border: 1px solid var(--gold);
+      color: var(--gold-light);
+      font-family: 'Cinzel', serif;
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      padding: 0.75rem 1.5rem;
+      border-radius: 2px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 2000;
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.error { border-color: var(--red-dot); color: #ff8a80; }
+
+    /* ── FOOTER ── */
+    footer {
+      font-size: 0.8rem;
+      color: rgba(201,146,10,0.4);
+      font-family: 'Cinzel', serif;
+      letter-spacing: 0.08em;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <span class="om">ॐ</span>
+    <h1>Sree Vimala Horoscope</h1>
+    <p class="subtitle">Janma Patrika</p>
+    <div class="divider"></div>
+  </header>
+
+  <div class="card">
+    <p class="card-title"><span>Enter Your Birth Details</span></p>
+
+    <form class="form-grid" id="jpForm" novalidate>
+
+      <div class="field">
+        <label for="fullName">Full Name <span class="req">*</span></label>
+        <input type="text" id="fullName" name="fullName" placeholder="As per birth records" required />
+      </div>
+
+      <div class="row-2">
+        <div class="field">
+          <label for="dob">Date of Birth <span class="req">*</span></label>
+          <input type="text" id="dob" name="dob" placeholder="DD/MM/YYYY" maxlength="10" required />
+        </div>
+        <div class="field">
+          <label for="tob">Time of Birth <span class="req">*</span></label>
+          <input type="time" id="tob" name="tob" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="pob">Place of Birth <span class="req">*</span></label>
+        <input type="text" id="pob" name="pob" placeholder="City, State, Country" required />
+      </div>
+
+      <div class="field">
+        <label for="email">Email Address <span class="req">*</span></label>
+        <input type="email" id="email" name="email" placeholder="you@example.com" required />
+      </div>
+
+      <div class="field">
+        <label for="phone">WhatsApp Number <span class="req">*</span></label>
+        <input type="tel" id="phone" name="phone" placeholder="+91 98765 43210" required />
+      </div>
+
+      <button class="btn" type="submit" id="submitBtn">
+        Request Janma Patrika &nbsp;✦
+      </button>
+
+    </form>
+  </div>
+
+  <!-- Payment Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-title">Complete Your Payment</div>
+      <p class="modal-sub">Scan to pay via UPI (GPay / PhonePe / Paytm)</p>
+
+      <div class="qr-wrapper">
+        
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=sample@upi&pn=SreeVimalaHoroscope&am=500&cu=INR" width="180" height="180" alt="UPI QR Code" style="display:block;" />
+      </div>
+
+      <div class="modal-amount">₹ 500 /-</div>
+      <p class="modal-note">
+        After payment, please send the screenshot to our WhatsApp.<br/>
+        Your <strong>Janma Patrika</strong> will be delivered to your email &amp; WhatsApp within 24–48 hours.
+      </p>
+
+      <button class="close-btn" id="closeModal">Done</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <footer>॥ ಶ್ರೀ ವಿಮಲ ಜ್ಯೋತಿಷ್ಯ ॥</footer>
+
+  <!-- ─────────────────────────────────────────
+       EmailJS + Form Logic
+       Replace YOUR_PUBLIC_KEY, YOUR_SERVICE_ID,
+       YOUR_TEMPLATE_ID with actual EmailJS values
+       ───────────────────────────────────────── -->
+  <script>
+    // ── CONFIG ──────────────────────────────────────────────────────────────
+    const EMAILJS_PUBLIC_KEY  = 'cl_Z6ooYQJMq1XjOo';
+    const EMAILJS_SERVICE_ID  = 'service_szmpgym';
+    const EMAILJS_TEMPLATE_ID = 'template_t28d1w4';
+    // ────────────────────────────────────────────────────────────────────────
+
+    emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+
+    const form        = document.getElementById('jpForm');
+    const submitBtn   = document.getElementById('submitBtn');
+    const modalOverlay= document.getElementById('modalOverlay');
+    const closeModal  = document.getElementById('closeModal');
+    const toastEl     = document.getElementById('toast');
+
+    function showToast(msg, isError = false) {
+      toastEl.textContent = msg;
+      toastEl.className = 'toast' + (isError ? ' error' : '') + ' show';
+      setTimeout(() => { toastEl.className = 'toast' + (isError ? ' error' : ''); }, 4000);
+    }
+
+    function openModal() {
+      modalOverlay.classList.add('show');
+    }
+
+    closeModal.addEventListener('click', () => {
+      modalOverlay.classList.remove('show');
+    });
+
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) modalOverlay.classList.remove('show');
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Basic validation
+      const fields = ['fullName', 'dob', 'tob', 'pob', 'email', 'phone'];
+      for (const id of fields) {
+        if (!document.getElementById(id).value.trim()) {
+          showToast('Please fill in all required fields.', true);
+          document.getElementById(id).focus();
+          return;
+        }
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+
+      const templateParams = {
+        full_name:     document.getElementById('fullName').value.trim(),
+        date_of_birth: document.getElementById('dob').value,
+        time_of_birth: document.getElementById('tob').value,
+        place_of_birth:document.getElementById('pob').value.trim(),
+        email:         document.getElementById('email').value.trim(),
+        phone:         document.getElementById('phone').value.trim(),
+        to_email:      'manirajmohareer@gmail.com',   // your receiving email
+      };
+
+      try {
+        await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+        showToast('Details sent! Please complete payment below.');
+        form.reset();
+        setTimeout(openModal, 800);
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to send. Please try again or contact us.', true);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Request Janma Patrika ✦';
+      }
+    });
+  </script>
+</body>
+</html>

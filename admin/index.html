@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sree Vimala Horoscope – Admin PDF Tool</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Cinzel:wght@400;600&family=Crimson+Pro:wght@400;600&display=swap" rel="stylesheet" />
+
+  <!-- PDF libraries -->
+  <script src="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://unpkg.com/@pdf-lib/fontkit@1.1.1/dist/fontkit.umd.min.js"></script>
+
+  <style>
+    :root {
+      --saffron: #E8630A;
+      --gold: #C9920A;
+      --gold-light: #F0C040;
+      --deep: #1A0A00;
+      --maroon: #5C1A00;
+      --cream: #FDF6E3;
+      --cream-dark: #F5E9C8;
+      --red-dot: #C0392B;
+      --text: #2C1200;
+      --muted: #7A5C3A;
+      --border: rgba(201,146,10,0.35);
+      --success: #2E7D32;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--deep);
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(232,99,10,0.18) 0%, transparent 70%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0 L60 30 L30 60 L0 30 Z' fill='none' stroke='rgba(201,146,10,0.06)' stroke-width='1'/%3E%3C/svg%3E");
+      min-height: 100vh;
+      font-family: 'Crimson Pro', Georgia, serif;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+
+    header { text-align: center; margin-bottom: 1.5rem; }
+    .om { font-size: 2.2rem; color: var(--gold-light); display: block; margin-bottom: 0.3rem; text-shadow: 0 0 14px rgba(240,192,64,0.6); }
+    h1 { font-family: 'Cinzel Decorative', serif; font-size: clamp(1.3rem, 4.5vw, 2.2rem); color: var(--gold-light); letter-spacing: 0.04em; }
+    .subtitle { font-family: 'Cinzel', serif; font-size: 0.75rem; color: var(--saffron); letter-spacing: 0.22em; text-transform: uppercase; margin-top: 0.4rem; }
+    .admin-badge {
+      display: inline-block; margin-top: 0.6rem; padding: 0.2rem 0.7rem;
+      background: var(--maroon); color: var(--gold-light);
+      font-family: 'Cinzel', serif; font-size: 0.68rem; letter-spacing: 0.14em; border-radius: 2px;
+    }
+    .divider { margin: 1rem auto 0; width: min(300px, 80%); height: 1px; background: linear-gradient(to right, transparent, var(--gold), transparent); }
+
+    .card {
+      background: linear-gradient(160deg, var(--cream) 0%, var(--cream-dark) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      box-shadow: 0 0 0 1px rgba(201,146,10,0.12), 0 8px 40px rgba(26,10,0,0.7), inset 0 1px 0 rgba(255,255,255,0.6);
+      width: min(620px, 94vw);
+      padding: clamp(1.5rem, 5vw, 2.5rem);
+      margin: 1rem 0;
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before, .card::after {
+      content: ''; position: absolute; width: 50px; height: 50px;
+      border-color: var(--gold); border-style: solid; opacity: 0.35;
+    }
+    .card::before { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+    .card::after  { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+
+    .card-title { font-family: 'Cinzel', serif; font-size: 0.9rem; color: var(--maroon); letter-spacing: 0.12em; text-transform: uppercase; text-align: center; margin-bottom: 1.4rem; }
+    .card-title span { display: inline-block; border-bottom: 1px solid var(--gold); padding-bottom: 0.3rem; }
+
+    /* Steps */
+    .step {
+      display: flex; align-items: flex-start; gap: 0.9rem;
+      padding: 0.9rem 0; border-bottom: 1px dashed rgba(201,146,10,0.25);
+    }
+    .step:last-of-type { border-bottom: none; }
+    .step-num {
+      flex-shrink: 0;
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--maroon); color: var(--gold-light);
+      font-family: 'Cinzel', serif; font-weight: 700; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .step-content { flex: 1; }
+    .step-label { font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--maroon); margin-bottom: 0.3rem; }
+    .step-hint { font-size: 0.95rem; color: var(--muted); font-style: italic; margin-bottom: 0.5rem; }
+
+    /* File drop zone */
+    .dropzone {
+      border: 2px dashed var(--gold);
+      border-radius: 3px;
+      padding: 1.4rem 1rem;
+      text-align: center;
+      background: rgba(255,255,255,0.35);
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      user-select: none;
+    }
+    .dropzone:hover { background: rgba(255,255,255,0.6); border-color: var(--saffron); }
+    .dropzone.has-file { border-style: solid; background: rgba(46,125,50,0.08); border-color: var(--success); }
+    .dropzone input { display: none; }
+    .dropzone-icon { font-size: 1.8rem; display: block; margin-bottom: 0.3rem; }
+    .dropzone-text { font-size: 0.9rem; color: var(--text); }
+    .dropzone-filename { color: var(--success); font-weight: 600; word-break: break-all; }
+
+    /* Extracted data display */
+    .preview {
+      margin-top: 1rem;
+      background: rgba(255,255,255,0.55);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.9rem;
+      display: none;
+    }
+    .preview.show { display: block; }
+    .preview-title { font-family: 'Cinzel', serif; font-size: 0.75rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--maroon); margin-bottom: 0.6rem; }
+    .preview-row { display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.9rem; border-bottom: 1px dotted rgba(201,146,10,0.3); }
+    .preview-row:last-child { border-bottom: none; }
+    .preview-row .k { color: var(--muted); font-weight: 600; }
+    .preview-row .v { color: var(--text); word-break: break-word; }
+    .preview-row input {
+      border: 1px solid transparent;
+      background: transparent;
+      font-family: inherit; font-size: inherit; color: var(--text);
+      width: 100%; padding: 0.15rem 0.3rem; border-radius: 2px;
+    }
+    .preview-row input:focus { outline: none; border-color: var(--gold); background: #fff; }
+
+    /* Generate button */
+    .btn {
+      display: block; width: 100%;
+      margin-top: 1.4rem;
+      padding: 0.95rem 1.5rem;
+      font-family: 'Cinzel', serif;
+      font-size: 0.9rem; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--deep);
+      background: linear-gradient(135deg, var(--gold-light) 0%, var(--saffron) 100%);
+      border: none; border-radius: 2px;
+      cursor: pointer;
+      transition: filter 0.2s, transform 0.15s;
+      box-shadow: 0 3px 14px rgba(232,99,10,0.4);
+    }
+    .btn:hover:not(:disabled) { filter: brightness(1.06); transform: translateY(-1px); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.4); }
+
+    /* Status */
+    .status {
+      margin-top: 1rem;
+      padding: 0.7rem 1rem;
+      font-size: 0.9rem;
+      border-radius: 3px;
+      display: none;
+    }
+    .status.show { display: block; }
+    .status.info    { background: rgba(201,146,10,0.12); color: var(--maroon); border-left: 3px solid var(--gold); }
+    .status.error   { background: rgba(192,57,43,0.12); color: #7a1e14; border-left: 3px solid var(--red-dot); }
+    .status.success { background: rgba(46,125,50,0.12); color: #1e5a22; border-left: 3px solid var(--success); }
+
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(92,26,0,0.25); border-top-color: var(--maroon);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 0.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer {
+      font-family: 'Cinzel', serif;
+      font-size: 0.7rem; color: rgba(201,146,10,0.4); letter-spacing: 0.1em;
+      margin-top: 1.5rem;
+    }
+    a.back-link {
+      display: inline-block; margin-top: 0.5rem;
+      color: var(--gold); text-decoration: none; font-size: 0.8rem;
+      letter-spacing: 0.08em; text-transform: uppercase; font-family: 'Cinzel', serif;
+    }
+    a.back-link:hover { color: var(--gold-light); }
+
+    /* Password gate */
+    .gate-overlay {
+      position: fixed; inset: 0; z-index: 999;
+      background: var(--deep);
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% 30%, rgba(232,99,10,0.22) 0%, transparent 70%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 1.5rem;
+    }
+    .gate-overlay.hide { display: none; }
+    .gate-box {
+      background: linear-gradient(160deg, var(--cream) 0%, var(--cream-dark) 100%);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2.2rem 2rem;
+      width: min(380px, 94vw);
+      text-align: center;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.7);
+    }
+    .gate-om { font-size: 2.4rem; color: var(--gold); display:block; margin-bottom: 0.3rem; }
+    .gate-title { font-family: 'Cinzel Decorative', serif; font-size: 1.3rem; color: var(--maroon); margin-bottom: 0.3rem; }
+    .gate-sub { font-family: 'Cinzel', serif; font-size: 0.7rem; color: var(--saffron); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 1.3rem; }
+    .gate-input {
+      width: 100%; padding: 0.7rem 0.9rem;
+      background: rgba(255,255,255,0.7);
+      border: 1px solid rgba(201,146,10,0.4); border-radius: 2px;
+      font-family: 'Crimson Pro', serif; font-size: 1rem; color: var(--text);
+      text-align: center; letter-spacing: 0.15em;
+      outline: none;
+    }
+    .gate-input:focus { border-color: var(--gold); background: #fff; box-shadow: 0 0 0 3px rgba(201,146,10,0.15); }
+    .gate-btn {
+      width: 100%; margin-top: 0.9rem;
+      padding: 0.7rem; border: none; border-radius: 2px; cursor: pointer;
+      font-family: 'Cinzel', serif; font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--deep);
+      background: linear-gradient(135deg, var(--gold-light) 0%, var(--saffron) 100%);
+      box-shadow: 0 3px 12px rgba(232,99,10,0.3);
+    }
+    .gate-error { margin-top: 0.7rem; color: var(--red-dot); font-size: 0.85rem; display:none; }
+    .gate-error.show { display:block; }
+  </style>
+</head>
+<body>
+
+  <!-- Password Gate -->
+  <div class="gate-overlay" id="gateOverlay">
+    <div class="gate-box">
+      <span class="gate-om">ॐ</span>
+      <div class="gate-title">Sree Vimala</div>
+      <div class="gate-sub">Admin Access</div>
+      <input type="password" class="gate-input" id="gateInput" placeholder="Enter password" autocomplete="off" />
+      <button class="gate-btn" id="gateBtn">Unlock</button>
+      <div class="gate-error" id="gateError">Incorrect password. Please try again.</div>
+    </div>
+  </div>
+
+  <header>
+    <span class="om">ॐ</span>
+    <h1>Sree Vimala Horoscope</h1>
+    <p class="subtitle">Janma Patrika</p>
+    <span class="admin-badge">ADMIN · PDF BUILDER</span>
+    <div class="divider"></div>
+  </header>
+
+  <div class="card">
+    <p class="card-title"><span>Generate Branded Janma Patrika</span></p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-label">Upload Kundli PDF</div>
+        <p class="step-hint">Upload the original PDF generated from onlinejyotish.com (or similar)</p>
+        <label class="dropzone" id="dropzone" for="pdfInput">
+          <input type="file" id="pdfInput" accept="application/pdf" />
+          <span class="dropzone-icon">📄</span>
+          <span class="dropzone-text" id="dropzoneText">Click to choose PDF or drag here</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Step 2 – details preview -->
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-label">Review Extracted Details</div>
+        <p class="step-hint">Auto-extracted from page 1. You can edit any field before generating.</p>
+        <div class="preview" id="preview">
+          <div class="preview-title">జనన వివరములు · Janma Vivaramulu</div>
+          <div class="preview-row"><span class="k">పేరు (Name)</span><input type="text" id="f_name"></div>
+          <div class="preview-row"><span class="k">లింగం (Gender)</span><input type="text" id="f_gender"></div>
+          <div class="preview-row"><span class="k">పుట్టిన తేది (DOB)</span><input type="text" id="f_dob"></div>
+          <div class="preview-row"><span class="k">పుట్టిన సమయం (TOB)</span><input type="text" id="f_tob"></div>
+          <div class="preview-row"><span class="k">పుట్టిన స్థలము (Place)</span><input type="text" id="f_place"></div>
+          <div class="preview-row"><span class="k">అక్షాంశము (Latitude)</span><input type="text" id="f_lat"></div>
+          <div class="preview-row"><span class="k">రేఖాంశము (Longitude)</span><input type="text" id="f_lng"></div>
+          <div class="preview-row"><span class="k">టైం జోన్ (Timezone)</span><input type="text" id="f_tz"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-label">Generate Final PDF</div>
+        <p class="step-hint">Replaces page 1 with the branded Sree Vimala template filled with details above. All remaining pages stay intact.</p>
+        <button class="btn" id="generateBtn" disabled>Generate &amp; Download &nbsp;✦</button>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <footer>॥ ಶ್ರೀ ವಿಮಲ ಜ್ಯೋತಿಷ್ಯ ॥</footer>
+
+<script>
+// ── Password Gate ──────────────────────────
+// Change this password anytime — it's only a light gate to prevent casual access.
+const ADMIN_PASSWORD = 'vimala2026';
+
+(function initGate() {
+  const overlay = document.getElementById('gateOverlay');
+  const input   = document.getElementById('gateInput');
+  const btn     = document.getElementById('gateBtn');
+  const errEl   = document.getElementById('gateError');
+
+  // Remember unlock within this browser tab session
+  if (sessionStorage.getItem('svh_admin_unlocked') === 'yes') {
+    overlay.classList.add('hide');
+    return;
+  }
+  setTimeout(() => input.focus(), 100);
+
+  function tryUnlock() {
+    if (input.value === ADMIN_PASSWORD) {
+      sessionStorage.setItem('svh_admin_unlocked', 'yes');
+      overlay.classList.add('hide');
+    } else {
+      errEl.classList.add('show');
+      input.value = '';
+      input.focus();
+    }
+  }
+  btn.addEventListener('click', tryUnlock);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryUnlock(); });
+})();
+
+// ─────────────────────────────────────────────
+//   Sree Vimala Horoscope · Admin PDF Builder
+// ─────────────────────────────────────────────
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+
+const TEMPLATE_URL = 'template.pdf';
+// Noto Sans Telugu - Telugu + Latin capable font (loaded once, embedded into PDF)
+const TELUGU_FONT_URL = 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-telugu@5.0.10/files/noto-sans-telugu-telugu-400-normal.woff';
+// Fallback: we will fetch the TTF instead, since pdf-lib needs TTF/OTF
+const TELUGU_TTF_URL  = 'https://raw.githubusercontent.com/googlefonts/noto-fonts/main/unhinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf';
+
+// Fields + cell Y positions on the template (left col = label, right col = value)
+// Template page = 612 x 792 pts. Cells extracted from firstpageReplacment.pdf.
+// PDF coordinates: origin at BOTTOM-LEFT. We convert from top-left bbox → baseline y.
+const PAGE_H = 792;
+const VALUE_X = 255;   // x coordinate where value text starts (inside right column)
+const FONT_SIZE = 11;
+const ROWS = [
+  // key,            top_y,  bottom_y  (top-left origin from pdfplumber)
+  ['name',   413.50, 439.22],
+  ['gender', 439.22, 464.62],
+  ['dob',    464.62, 490.02],
+  ['tob',    490.02, 515.42],
+  ['place',  515.42, 540.82],
+  ['lat',    540.82, 566.22],
+  ['lng',    566.22, 591.62],
+  ['tz',     591.62, 616.96],
+];
+
+const el = {
+  drop:       document.getElementById('dropzone'),
+  fileInput:  document.getElementById('pdfInput'),
+  dropText:   document.getElementById('dropzoneText'),
+  preview:    document.getElementById('preview'),
+  generate:   document.getElementById('generateBtn'),
+  status:     document.getElementById('status'),
+  f: {
+    name:   document.getElementById('f_name'),
+    gender: document.getElementById('f_gender'),
+    dob:    document.getElementById('f_dob'),
+    tob:    document.getElementById('f_tob'),
+    place:  document.getElementById('f_place'),
+    lat:    document.getElementById('f_lat'),
+    lng:    document.getElementById('f_lng'),
+    tz:     document.getElementById('f_tz'),
+  }
+};
+
+let uploadedPdfBytes = null;
+let extractedData = null;
+
+// ── Helpers ─────────────────────────────────
+function setStatus(msg, type = 'info') {
+  el.status.className = `status ${type} show`;
+  el.status.innerHTML = msg;
+}
+function clearStatus() { el.status.className = 'status'; el.status.innerHTML = ''; }
+
+// Drag + drop
+['dragenter', 'dragover'].forEach(ev =>
+  el.drop.addEventListener(ev, e => { e.preventDefault(); el.drop.style.background = 'rgba(240,192,64,0.2)'; })
+);
+['dragleave', 'drop'].forEach(ev =>
+  el.drop.addEventListener(ev, e => { e.preventDefault(); el.drop.style.background = ''; })
+);
+el.drop.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+el.fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+
+async function handleFile(file) {
+  if (file.type !== 'application/pdf') {
+    setStatus('❌ Please upload a PDF file.', 'error');
+    return;
+  }
+  clearStatus();
+  el.drop.classList.add('has-file');
+  el.dropText.innerHTML = `<span class="dropzone-filename">✓ ${file.name}</span>`;
+  setStatus('<span class="spinner"></span> Reading PDF & extracting birth details…', 'info');
+
+  uploadedPdfBytes = await file.arrayBuffer();
+
+  try {
+    extractedData = await extractBirthDetails(uploadedPdfBytes);
+    populatePreview(extractedData);
+    el.preview.classList.add('show');
+    el.generate.disabled = false;
+    setStatus('✓ Details extracted — review above, edit if needed, then generate.', 'success');
+  } catch (err) {
+    console.error(err);
+    setStatus(`❌ Could not auto-extract details: ${err.message}<br>You can still edit the fields manually and generate.`, 'error');
+    el.preview.classList.add('show');
+    el.generate.disabled = false;
+  }
+}
+
+// ── Extract the birth details from page 1 of uploaded PDF ──
+async function extractBirthDetails(pdfBytes) {
+  const pdf = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
+  const page = await pdf.getPage(1);
+  const tc = await page.getTextContent();
+
+  // Gather text items with positions
+  const items = tc.items.map(it => ({
+    str: it.str.trim(),
+    x: it.transform[4],
+    y: it.transform[5],
+  })).filter(it => it.str);
+
+  // Group into rows by y coordinate (within 3pt)
+  const rows = [];
+  items.forEach(it => {
+    const row = rows.find(r => Math.abs(r.y - it.y) < 3);
+    if (row) row.items.push(it);
+    else rows.push({ y: it.y, items: [it] });
+  });
+  rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
+  rows.sort((a, b) => b.y - a.y);
+
+  // Helper: find row whose first item matches any of given Telugu labels, then return joined remaining items
+  function findValue(labelRegexes) {
+    for (const row of rows) {
+      const first = row.items[0]?.str || '';
+      if (labelRegexes.some(rx => rx.test(first))) {
+        return row.items.slice(1).map(i => i.str).join(' ').trim();
+      }
+    }
+    return '';
+  }
+
+  return {
+    name:   findValue([/పేరు/, /^Name/i]),
+    gender: findValue([/లింగం/, /^Gender/i]),
+    dob:    findValue([/పుట్టిన\s*తేది/, /పుటి.*తేది/, /Date.*Birth/i]),
+    tob:    findValue([/పుట్టిన\s*సమయం/, /పుటి.*సమయం/, /Time.*Birth/i]),
+    place:  findValue([/పుట్టిన\s*స్థలము/, /పుటి.*సల.*ము/, /పుటి.*స.*ల.*ము/, /Place.*Birth/i]),
+    lat:    findValue([/అక్షాంశము/, /అ.*ంశము/, /Latitude/i]),
+    lng:    findValue([/రేఖాంశము/, /Longitude/i]),
+    tz:     findValue([/టైం\s*జోన్/, /Time\s*Zone/i, /Timezone/i]),
+  };
+}
+
+function populatePreview(data) {
+  Object.keys(el.f).forEach(k => { el.f[k].value = data[k] || ''; });
+}
+
+// ── Generate the final PDF ─────────────────
+el.generate.addEventListener('click', async () => {
+  if (!uploadedPdfBytes) return;
+  el.generate.disabled = true;
+  setStatus('<span class="spinner"></span> Building branded PDF… (embedding Telugu font, this may take a few seconds)', 'info');
+
+  try {
+    const finalBytes = await buildFinalPdf();
+    const name = (el.f.name.value || 'JanmaPatrika').replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_');
+    downloadBytes(finalBytes, `${name}_JanmaPatrika.pdf`);
+    setStatus(`✅ Success! "${name}_JanmaPatrika.pdf" has been downloaded.`, 'success');
+  } catch (err) {
+    console.error(err);
+    setStatus(`❌ Failed to generate PDF: ${err.message}`, 'error');
+  } finally {
+    el.generate.disabled = false;
+  }
+});
+
+async function buildFinalPdf() {
+  const { PDFDocument, rgb } = PDFLib;
+
+  // Load template, uploaded pdf, telugu font in parallel
+  const [templateBytes, fontBytes] = await Promise.all([
+    fetch(TEMPLATE_URL).then(r => {
+      if (!r.ok) throw new Error('Could not load template.pdf');
+      return r.arrayBuffer();
+    }),
+    fetch(TELUGU_TTF_URL).then(r => {
+      if (!r.ok) throw new Error('Could not load Telugu font');
+      return r.arrayBuffer();
+    }),
+  ]);
+
+  // Load the uploaded Kundli
+  const uploadedDoc = await PDFDocument.load(uploadedPdfBytes);
+  const totalPages = uploadedDoc.getPageCount();
+
+  // Load template
+  const templateDoc = await PDFDocument.load(templateBytes);
+  templateDoc.registerFontkit(fontkit);
+  const teluguFont = await templateDoc.embedFont(fontBytes, { subset: true });
+
+  // Draw values onto the template's page 1
+  const page1 = templateDoc.getPage(0);
+  const values = {
+    name:   el.f.name.value.trim(),
+    gender: el.f.gender.value.trim(),
+    dob:    el.f.dob.value.trim(),
+    tob:    el.f.tob.value.trim(),
+    place:  el.f.place.value.trim(),
+    lat:    el.f.lat.value.trim(),
+    lng:    el.f.lng.value.trim(),
+    tz:     el.f.tz.value.trim(),
+  };
+
+  for (const [key, topY, bottomY] of ROWS) {
+    const val = values[key];
+    if (!val) continue;
+    // Vertical center of the cell, converted from top-left origin to bottom-left
+    const cellCenterTopOrigin = (topY + bottomY) / 2;
+    const yBaseline = PAGE_H - cellCenterTopOrigin - FONT_SIZE / 2 + 2;
+
+    // If text is too long, wrap to 2 lines
+    const maxWidth = 260; // right col width approx
+    const lines = wrapText(val, teluguFont, FONT_SIZE, maxWidth);
+    const lineGap = FONT_SIZE + 1;
+    const startY = yBaseline + ((lines.length - 1) * lineGap) / 2;
+
+    lines.forEach((ln, idx) => {
+      page1.drawText(ln, {
+        x: VALUE_X,
+        y: startY - idx * lineGap,
+        size: FONT_SIZE,
+        font: teluguFont,
+        color: rgb(0.17, 0.07, 0),
+      });
+    });
+  }
+
+  // Now merge: [filled template page 1] + [uploaded pages 2..N]
+  const finalDoc = await PDFDocument.create();
+  finalDoc.registerFontkit(fontkit);
+
+  // Copy the filled template page
+  const [filledPage] = await finalDoc.copyPages(templateDoc, [0]);
+  finalDoc.addPage(filledPage);
+
+  // Copy remaining pages from uploaded doc (page 2 onwards)
+  if (totalPages > 1) {
+    const idxs = Array.from({ length: totalPages - 1 }, (_, i) => i + 1);
+    const restPages = await finalDoc.copyPages(uploadedDoc, idxs);
+    restPages.forEach(p => finalDoc.addPage(p));
+  }
+
+  // Metadata
+  finalDoc.setTitle(`Janma Patrika - ${values.name || 'Sree Vimala'}`);
+  finalDoc.setAuthor('Sree Vimala Horoscope');
+  finalDoc.setCreator('Sree Vimala Horoscope');
+
+  return await finalDoc.save();
+}
+
+function wrapText(text, font, size, maxWidth) {
+  const words = text.split(/\s+/);
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    const width = font.widthOfTextAtSize(test, size);
+    if (width <= maxWidth) cur = test;
+    else {
+      if (cur) lines.push(cur);
+      cur = w;
+    }
+    if (lines.length >= 1 && cur.length > 60) break; // cap
+  }
+  if (cur) lines.push(cur);
+  return lines.slice(0, 2); // max 2 lines
+}
+
+function downloadBytes(bytes, filename) {
+  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+</script>
+</body>
+</html>

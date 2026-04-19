@@ -418,16 +418,26 @@ async function handleFile(file) {
 
   uploadedPdfBytes = await file.arrayBuffer();
 
+  // Always show preview with empty fields so dad can edit
+  el.preview.classList.add('show');
+
   try {
     extractedData = await extractBirthDetails(uploadedPdfBytes);
+    console.log('[SVH] Extracted data:', extractedData);
     populatePreview(extractedData);
-    el.preview.classList.add('show');
+
+    const filledCount = Object.values(extractedData).filter(v => v).length;
+    if (filledCount === 0) {
+      setStatus('⚠️ Couldn\'t auto-extract details. Please fill in the fields above manually, then click Generate.', 'error');
+    } else if (filledCount < 6) {
+      setStatus(`✓ Extracted ${filledCount} of 8 fields. Please check & fill any missing fields, then Generate.`, 'info');
+    } else {
+      setStatus('✓ Details extracted — review above, edit if needed, then Generate.', 'success');
+    }
     el.generate.disabled = false;
-    setStatus('✓ Details extracted — review above, edit if needed, then generate.', 'success');
   } catch (err) {
-    console.error(err);
-    setStatus(`❌ Could not auto-extract details: ${err.message}<br>You can still edit the fields manually and generate.`, 'error');
-    el.preview.classList.add('show');
+    console.error('[SVH] Extraction error:', err);
+    setStatus(`⚠️ Auto-extraction failed. Please fill in the fields manually above, then Generate.`, 'error');
     el.generate.disabled = false;
   }
 }
@@ -436,46 +446,109 @@ async function handleFile(file) {
 async function extractBirthDetails(pdfBytes) {
   const pdf = await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise;
   const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 1 });
+  const pageHeight = viewport.height;
   const tc = await page.getTextContent();
 
-  // Gather text items with positions
+  console.log(`[SVH] PDF page size: ${viewport.width} x ${pageHeight}`);
+  console.log(`[SVH] Total text items: ${tc.items.length}`);
+
+  // Gather text items with positions (PDF.js y is bottom-origin already in transform[5])
   const items = tc.items.map(it => ({
-    str: it.str.trim(),
+    str: it.str,
     x: it.transform[4],
     y: it.transform[5],
-  })).filter(it => it.str);
+    w: it.width || 0,
+  })).filter(it => it.str && it.str.trim());
 
-  // Group into rows by y coordinate (within 3pt)
+  // Debug: log a few
+  console.log('[SVH] Sample text items:', items.slice(0, 30).map(i => `"${i.str}" @(${i.x.toFixed(0)},${i.y.toFixed(0)})`));
+
+  // Group into rows by y coordinate (within 4pt tolerance)
   const rows = [];
   items.forEach(it => {
-    const row = rows.find(r => Math.abs(r.y - it.y) < 3);
+    const row = rows.find(r => Math.abs(r.y - it.y) < 4);
     if (row) row.items.push(it);
     else rows.push({ y: it.y, items: [it] });
   });
   rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
-  rows.sort((a, b) => b.y - a.y);
+  rows.sort((a, b) => b.y - a.y); // top to bottom
 
-  // Helper: find row whose first item matches any of given Telugu labels, then return joined remaining items
-  function findValue(labelRegexes) {
-    for (const row of rows) {
-      const first = row.items[0]?.str || '';
-      if (labelRegexes.some(rx => rx.test(first))) {
-        return row.items.slice(1).map(i => i.str).join(' ').trim();
+  console.log('[SVH] Rows detected:', rows.length);
+  rows.forEach((r, i) => {
+    const joined = r.items.map(it => it.str).join(' | ');
+    console.log(`  Row ${i} y=${r.y.toFixed(0)}: ${joined}`);
+  });
+
+  // Strategy: find all rows that have a "gap" suggesting label + value format,
+  // specifically rows where there are text items on the LEFT (x<240) AND on the RIGHT (x>240).
+  // These are table rows. Extract rows in this format, and map by order.
+  const tableRows = rows.filter(r => {
+    const hasLeft = r.items.some(it => it.x < 240);
+    const hasRight = r.items.some(it => it.x >= 240);
+    return hasLeft && hasRight;
+  });
+
+  console.log('[SVH] Table-like rows (with left+right content):', tableRows.length);
+
+  // For each table row, extract the right-side value (joining all items with x >= 240)
+  const valueList = tableRows.map(r => {
+    return r.items
+      .filter(it => it.x >= 240)
+      .map(it => it.str)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  });
+
+  console.log('[SVH] Extracted values in order:', valueList);
+
+  // The Kundli table has 8 data rows in this exact order:
+  // 1. పేరు (Name)  2. లింగం (Gender)  3. పుట్టిన తేది (DOB)  4. పుట్టిన సమయం (TOB)
+  // 5. పుట్టిన స్థలము (Place)  6. అక్షాంశము (Latitude)  7. రేఖాంశము (Longitude)  8. టైం జోన్ (Timezone)
+  //
+  // We take the FIRST 8 table rows we found (in order from top of page).
+  // NOTE: We may have picked up the "జనన వివరములు" header row too. Filter out rows
+  // where the left side contains "జనన వివరములు" or where there is no clear label/value split.
+
+  // Find the main data table: first group of ≥6 consecutive table rows near top-half of page.
+  // Simpler: just take the 8 rows whose label cell contains one of the known patterns.
+  const LABEL_PATTERNS = [
+    /పేరు|^Name/i,          // name
+    /లింగం|Gender|Sex/i,    // gender
+    /తేది|Date|DOB/i,       // dob
+    /సమయం|Time.*Birth/i,    // tob
+    /స్థల|Place/i,          // place
+    /అక్ష|Latitude/i,       // lat
+    /రేఖ|Longitude/i,       // lng
+    /టైం\s*జోన|Time\s*Zone|Zone/i,  // tz
+  ];
+  const keys = ['name', 'gender', 'dob', 'tob', 'place', 'lat', 'lng', 'tz'];
+
+  const result = { name:'', gender:'', dob:'', tob:'', place:'', lat:'', lng:'', tz:'' };
+
+  for (const row of tableRows) {
+    const leftText = row.items.filter(it => it.x < 240).map(it => it.str).join('').trim();
+    const rightText = row.items.filter(it => it.x >= 240).map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+    if (!rightText) continue;
+
+    for (let i = 0; i < LABEL_PATTERNS.length; i++) {
+      if (LABEL_PATTERNS[i].test(leftText)) {
+        if (!result[keys[i]]) result[keys[i]] = rightText;
+        break;
       }
     }
-    return '';
   }
 
-  return {
-    name:   findValue([/పేరు/, /^Name/i]),
-    gender: findValue([/లింగం/, /^Gender/i]),
-    dob:    findValue([/పుట్టిన\s*తేది/, /పుటి.*తేది/, /Date.*Birth/i]),
-    tob:    findValue([/పుట్టిన\s*సమయం/, /పుటి.*సమయం/, /Time.*Birth/i]),
-    place:  findValue([/పుట్టిన\s*స్థలము/, /పుటి.*సల.*ము/, /పుటి.*స.*ల.*ము/, /Place.*Birth/i]),
-    lat:    findValue([/అక్షాంశము/, /అ.*ంశము/, /Latitude/i]),
-    lng:    findValue([/రేఖాంశము/, /Longitude/i]),
-    tz:     findValue([/టైం\s*జోన్/, /Time\s*Zone/i, /Timezone/i]),
-  };
+  // Fallback: if label matching didn't find anything, just take first 8 rows in order
+  if (Object.values(result).every(v => !v) && valueList.length >= 6) {
+    for (let i = 0; i < Math.min(keys.length, valueList.length); i++) {
+      result[keys[i]] = valueList[i];
+    }
+    console.log('[SVH] Used fallback positional extraction');
+  }
+
+  return result;
 }
 
 function populatePreview(data) {
@@ -504,29 +577,22 @@ el.generate.addEventListener('click', async () => {
 async function buildFinalPdf() {
   const { PDFDocument, rgb } = PDFLib;
 
+  console.log('[SVH] Starting PDF build…');
+
   // Load template, uploaded pdf, telugu font in parallel
   const [templateBytes, fontBytes] = await Promise.all([
     fetch(TEMPLATE_URL).then(r => {
-      if (!r.ok) throw new Error('Could not load template.pdf');
+      if (!r.ok) throw new Error(`Could not load template.pdf (HTTP ${r.status})`);
       return r.arrayBuffer();
     }),
     fetch(TELUGU_TTF_URL).then(r => {
-      if (!r.ok) throw new Error('Could not load Telugu font');
+      if (!r.ok) throw new Error(`Could not load Telugu font (HTTP ${r.status})`);
       return r.arrayBuffer();
     }),
   ]);
+  console.log(`[SVH] Template: ${templateBytes.byteLength} bytes, Font: ${fontBytes.byteLength} bytes`);
 
-  // Load the uploaded Kundli
-  const uploadedDoc = await PDFDocument.load(uploadedPdfBytes);
-  const totalPages = uploadedDoc.getPageCount();
-
-  // Load template
-  const templateDoc = await PDFDocument.load(templateBytes);
-  templateDoc.registerFontkit(fontkit);
-  const teluguFont = await templateDoc.embedFont(fontBytes, { subset: true });
-
-  // Draw values onto the template's page 1
-  const page1 = templateDoc.getPage(0);
+  // Collect values from the form
   const values = {
     name:   el.f.name.value.trim(),
     gender: el.f.gender.value.trim(),
@@ -537,16 +603,38 @@ async function buildFinalPdf() {
     lng:    el.f.lng.value.trim(),
     tz:     el.f.tz.value.trim(),
   };
+  console.log('[SVH] Values to draw:', values);
 
-  for (const [key, topY, bottomY] of ROWS) {
+  const allEmpty = Object.values(values).every(v => !v);
+  if (allEmpty) {
+    throw new Error('All fields are empty. Please fill in the details before generating.');
+  }
+
+  // Build final doc directly, copying pages FIRST, then drawing on top
+  const finalDoc = await PDFDocument.create();
+  finalDoc.registerFontkit(fontkit);
+  const teluguFont = await finalDoc.embedFont(fontBytes, { subset: true });
+  console.log('[SVH] Font embedded in final doc');
+
+  // Copy the template page into final doc
+  const templateDoc = await PDFDocument.load(templateBytes);
+  const [templatePageInFinal] = await finalDoc.copyPages(templateDoc, [0]);
+  finalDoc.addPage(templatePageInFinal);
+  console.log('[SVH] Template page copied into final doc');
+
+  // Now draw on this page (which is already in finalDoc with the font registered)
+  const page1 = finalDoc.getPage(0);
+
+  let drawnCount = 0;
+  for (const row of ROWS) {
+    const key = row[0], topY = row[1], bottomY = row[2];
     const val = values[key];
     if (!val) continue;
-    // Vertical center of the cell, converted from top-left origin to bottom-left
+
     const cellCenterTopOrigin = (topY + bottomY) / 2;
     const yBaseline = PAGE_H - cellCenterTopOrigin - FONT_SIZE / 2 + 2;
 
-    // If text is too long, wrap to 2 lines
-    const maxWidth = 260; // right col width approx
+    const maxWidth = 260;
     const lines = wrapText(val, teluguFont, FONT_SIZE, maxWidth);
     const lineGap = FONT_SIZE + 1;
     const startY = yBaseline + ((lines.length - 1) * lineGap) / 2;
@@ -559,22 +647,20 @@ async function buildFinalPdf() {
         font: teluguFont,
         color: rgb(0.17, 0.07, 0),
       });
+      drawnCount++;
     });
+    console.log(`[SVH] Drew ${key}: "${val}" at y=${yBaseline.toFixed(1)}`);
   }
+  console.log(`[SVH] Total text lines drawn: ${drawnCount}`);
 
-  // Now merge: [filled template page 1] + [uploaded pages 2..N]
-  const finalDoc = await PDFDocument.create();
-  finalDoc.registerFontkit(fontkit);
-
-  // Copy the filled template page
-  const [filledPage] = await finalDoc.copyPages(templateDoc, [0]);
-  finalDoc.addPage(filledPage);
-
-  // Copy remaining pages from uploaded doc (page 2 onwards)
+  // Copy remaining pages from uploaded Kundli (page 2 onwards)
+  const uploadedDoc = await PDFDocument.load(uploadedPdfBytes);
+  const totalPages = uploadedDoc.getPageCount();
   if (totalPages > 1) {
     const idxs = Array.from({ length: totalPages - 1 }, (_, i) => i + 1);
     const restPages = await finalDoc.copyPages(uploadedDoc, idxs);
     restPages.forEach(p => finalDoc.addPage(p));
+    console.log(`[SVH] Copied ${restPages.length} additional pages`);
   }
 
   // Metadata
@@ -582,7 +668,9 @@ async function buildFinalPdf() {
   finalDoc.setAuthor('Sree Vimala Horoscope');
   finalDoc.setCreator('Sree Vimala Horoscope');
 
-  return await finalDoc.save();
+  const result = await finalDoc.save();
+  console.log(`[SVH] Final PDF: ${result.byteLength} bytes, ${finalDoc.getPageCount()} pages`);
+  return result;
 }
 
 function wrapText(text, font, size, maxWidth) {

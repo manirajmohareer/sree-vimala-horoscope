@@ -340,14 +340,19 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
 const TEMPLATE_URL = '/admin/template.pdf';
-// Font loading strategy: try these TTF sources in order. pdf-lib needs TTF/OTF (not WOFF/WOFF2).
-// First tries a local file (if you upload NotoSansTelugu-Regular.ttf to /admin/), then CDNs.
+// We use TWO fonts and pick per character:
+// 1. Helvetica (built-in, standard PDF font) for Latin letters/numbers/punctuation
+// 2. Noto Sans Telugu for Telugu script characters
+// This way English names render crisply and Telugu text also works.
 const FONT_URLS = [
-  '/admin/NotoSansTelugu-Regular.ttf',   // local (most reliable — upload this to your repo)
+  '/admin/NotoSansTelugu-Regular.ttf',   // local (upload this to your repo for 100% reliability)
   'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf',
   'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanstelugu/NotoSansTelugu%5Bwdth,wght%5D.ttf',
   'https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf',
 ];
+
+// Regex to detect Telugu characters (Unicode range U+0C00–U+0C7F)
+const TELUGU_REGEX = /[\u0C00-\u0C7F]/;
 
 // Fields + cell Y positions on the template (left col = label, right col = value)
 // Template page = 612 x 792 pts. Cells extracted from firstpageReplacment.pdf.
@@ -611,7 +616,7 @@ async function buildFinalPdf() {
     }
   }
   if (!fontBytes) {
-    throw new Error('Could not load Telugu font from any source. Please upload NotoSansTelugu-Regular.ttf to your /admin/ folder on GitHub.');
+    console.warn('[SVH] ⚠️ Telugu font could not be loaded — will render Latin chars only. Telugu chars (if any) will appear as boxes.');
   }
 
   // Collect values from the form
@@ -635,8 +640,21 @@ async function buildFinalPdf() {
   // Build final doc directly, copying pages FIRST, then drawing on top
   const finalDoc = await PDFDocument.create();
   finalDoc.registerFontkit(fontkit);
-  const teluguFont = await finalDoc.embedFont(fontBytes, { subset: true });
-  console.log('[SVH] Font embedded in final doc');
+
+  // Embed BOTH fonts: Helvetica for Latin (built-in), Noto Sans Telugu for Telugu script (optional)
+  const { StandardFonts } = PDFLib;
+  const latinFont  = await finalDoc.embedFont(StandardFonts.Helvetica);
+  let teluguFont = null;
+  if (fontBytes) {
+    try {
+      teluguFont = await finalDoc.embedFont(fontBytes, { subset: true });
+      console.log('[SVH] Both fonts embedded (Helvetica + Noto Telugu)');
+    } catch (e) {
+      console.warn('[SVH] Telugu font embed failed:', e.message);
+    }
+  } else {
+    console.log('[SVH] Using Helvetica only (no Telugu font available)');
+  }
 
   // Copy the template page into final doc
   const templateDoc = await PDFDocument.load(templateBytes);
@@ -644,8 +662,74 @@ async function buildFinalPdf() {
   finalDoc.addPage(templatePageInFinal);
   console.log('[SVH] Template page copied into final doc');
 
-  // Now draw on this page (which is already in finalDoc with the font registered)
+  // Now draw on this page
   const page1 = finalDoc.getPage(0);
+
+  // Helper to split text into runs of Latin vs Telugu characters
+  // so we can draw each run with the appropriate font
+  function splitRuns(text) {
+    const runs = [];
+    let current = '';
+    let currentIsTelugu = null;
+    for (const ch of text) {
+      const isTelugu = TELUGU_REGEX.test(ch);
+      if (currentIsTelugu === null || isTelugu === currentIsTelugu) {
+        current += ch;
+        currentIsTelugu = isTelugu;
+      } else {
+        runs.push({ text: current, isTelugu: currentIsTelugu });
+        current = ch;
+        currentIsTelugu = isTelugu;
+      }
+    }
+    if (current) runs.push({ text: current, isTelugu: currentIsTelugu });
+    return runs;
+  }
+
+  function drawMixedText(text, x, y, size) {
+    const runs = splitRuns(text);
+    let cursorX = x;
+    for (const run of runs) {
+      const font = (run.isTelugu && teluguFont) ? teluguFont : latinFont;
+      // If a Telugu run falls back to Latin font, replace chars it can't show with "?"
+      const safeText = (run.isTelugu && !teluguFont) ? run.text.replace(/[\u0C00-\u0C7F]/g, '?') : run.text;
+      page1.drawText(safeText, {
+        x: cursorX,
+        y,
+        size,
+        font,
+        color: rgb(0.17, 0.07, 0),
+      });
+      cursorX += font.widthOfTextAtSize(safeText, size);
+    }
+  }
+
+  function measureMixedText(text, size) {
+    const runs = splitRuns(text);
+    let w = 0;
+    for (const run of runs) {
+      const font = (run.isTelugu && teluguFont) ? teluguFont : latinFont;
+      const safeText = (run.isTelugu && !teluguFont) ? run.text.replace(/[\u0C00-\u0C7F]/g, '?') : run.text;
+      w += font.widthOfTextAtSize(safeText, size);
+    }
+    return w;
+  }
+
+  function wrapMixed(text, size, maxWidth) {
+    const words = text.split(/\s+/);
+    const lines = [];
+    let cur = '';
+    for (const w of words) {
+      const test = cur ? cur + ' ' + w : w;
+      if (measureMixedText(test, size) <= maxWidth) cur = test;
+      else {
+        if (cur) lines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) lines.push(cur);
+    return lines.slice(0, 2);
+  }
 
   let drawnCount = 0;
   for (const row of ROWS) {
@@ -657,18 +741,12 @@ async function buildFinalPdf() {
     const yBaseline = PAGE_H - cellCenterTopOrigin - FONT_SIZE / 2 + 2;
 
     const maxWidth = 260;
-    const lines = wrapText(val, teluguFont, FONT_SIZE, maxWidth);
+    const lines = wrapMixed(val, FONT_SIZE, maxWidth);
     const lineGap = FONT_SIZE + 1;
     const startY = yBaseline + ((lines.length - 1) * lineGap) / 2;
 
     lines.forEach((ln, idx) => {
-      page1.drawText(ln, {
-        x: VALUE_X,
-        y: startY - idx * lineGap,
-        size: FONT_SIZE,
-        font: teluguFont,
-        color: rgb(0.17, 0.07, 0),
-      });
+      drawMixedText(ln, VALUE_X, startY - idx * lineGap, FONT_SIZE);
       drawnCount++;
     });
     console.log(`[SVH] Drew ${key}: "${val}" at y=${yBaseline.toFixed(1)}`);

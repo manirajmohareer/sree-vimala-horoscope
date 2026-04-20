@@ -340,10 +340,14 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
 
 const TEMPLATE_URL = '/admin/template.pdf';
-// Noto Sans Telugu - Telugu + Latin capable font (loaded once, embedded into PDF)
-const TELUGU_FONT_URL = 'https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-telugu@5.0.10/files/noto-sans-telugu-telugu-400-normal.woff';
-// Fallback: we will fetch the TTF instead, since pdf-lib needs TTF/OTF
-const TELUGU_TTF_URL  = 'https://raw.githubusercontent.com/googlefonts/noto-fonts/main/unhinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf';
+// Font loading strategy: try these TTF sources in order. pdf-lib needs TTF/OTF (not WOFF/WOFF2).
+// First tries a local file (if you upload NotoSansTelugu-Regular.ttf to /admin/), then CDNs.
+const FONT_URLS = [
+  '/admin/NotoSansTelugu-Regular.ttf',   // local (most reliable — upload this to your repo)
+  'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf',
+  'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanstelugu/NotoSansTelugu%5Bwdth,wght%5D.ttf',
+  'https://raw.githubusercontent.com/googlefonts/noto-fonts/main/hinted/ttf/NotoSansTelugu/NotoSansTelugu-Regular.ttf',
+];
 
 // Fields + cell Y positions on the template (left col = label, right col = value)
 // Template page = 612 x 792 pts. Cells extracted from firstpageReplacment.pdf.
@@ -579,18 +583,36 @@ async function buildFinalPdf() {
 
   console.log('[SVH] Starting PDF build…');
 
-  // Load template, uploaded pdf, telugu font in parallel
-  const [templateBytes, fontBytes] = await Promise.all([
-    fetch(TEMPLATE_URL).then(r => {
-      if (!r.ok) throw new Error(`Could not load template.pdf (HTTP ${r.status})`);
-      return r.arrayBuffer();
-    }),
-    fetch(TELUGU_TTF_URL).then(r => {
-      if (!r.ok) throw new Error(`Could not load Telugu font (HTTP ${r.status})`);
-      return r.arrayBuffer();
-    }),
-  ]);
-  console.log(`[SVH] Template: ${templateBytes.byteLength} bytes, Font: ${fontBytes.byteLength} bytes`);
+  // Load template + telugu font (with fallback URLs)
+  const templateBytes = await fetch(TEMPLATE_URL).then(r => {
+    if (!r.ok) throw new Error(`Could not load template.pdf (HTTP ${r.status})`);
+    return r.arrayBuffer();
+  });
+  console.log(`[SVH] Template loaded: ${templateBytes.byteLength} bytes`);
+
+  let fontBytes = null;
+  let fontSourceUsed = null;
+  for (const url of FONT_URLS) {
+    try {
+      console.log(`[SVH] Trying font: ${url}`);
+      const r = await fetch(url);
+      if (!r.ok) { console.log(`[SVH]   -> HTTP ${r.status}`); continue; }
+      const buf = await r.arrayBuffer();
+      if (buf.byteLength < 10000) {
+        console.log(`[SVH]   -> too small (${buf.byteLength} bytes), likely not a font`);
+        continue;
+      }
+      fontBytes = buf;
+      fontSourceUsed = url;
+      console.log(`[SVH] ✓ Font loaded from: ${url} (${buf.byteLength} bytes)`);
+      break;
+    } catch (e) {
+      console.log(`[SVH]   -> error:`, e.message);
+    }
+  }
+  if (!fontBytes) {
+    throw new Error('Could not load Telugu font from any source. Please upload NotoSansTelugu-Regular.ttf to your /admin/ folder on GitHub.');
+  }
 
   // Collect values from the form
   const values = {
